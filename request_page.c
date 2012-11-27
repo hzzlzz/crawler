@@ -10,11 +10,12 @@
 #include<fcntl.h>
 #include<glib.h>
 #include<regex.h>
-#include "linked_list.h"
+#include "queue.h"
 #define PAGEMAX 500000
+#define FILENAMEMAX 100
 char page_buff[PAGEMAX]; 
 
-int generate_file_name(const char *hostname, char *filename, size_t size) {
+char * generate_file_name(const char *hostname, char *filename, size_t size) {
 	regex_t regex;
 	regmatch_t regmatchs[1];
 	int res;
@@ -23,25 +24,25 @@ int generate_file_name(const char *hostname, char *filename, size_t size) {
 		fprintf(stderr, "Could not complie regex\n");
 	}
 	strncpy(filename, hostname, size);
-	while(res = regexec(&regex, filename, 1, regmatchs, 0) == true) {
-		memset(filename, '_', regmatchs[1].rm_so);
+	while(!(res = regexec(&regex, filename, 1, regmatchs, 0))) {
+		memset(filename, '_', regmatchs[0].rm_so);
 	}
 	regfree(&regex);
-	return 0;
+	return filename;
 }
 
-int parse_web_page(linked_list *list_ptr, GHashTable *hashtable_ptr) {
+int parse_web_page(queue *queue_ptr, GHashTable *hashtable_ptr) {
 
 }
 
-int get_web_page(char *hostname, char *page_buff, size_t maxsize) {
+int get_web_page(char *hostname, char *page_buff, size_t size) {
 	int sockfd;
 	char buffer[1024];
 	char sendBuff[200];
 	struct sockaddr_in server_addr;
 	struct hostent *host;
 	int portnumber = 80, nbytes;
-	if(host = (struct hostent*)gethostbyname(hostname) == NULL) {
+	if((host = (struct hostent*)gethostbyname(hostname)) == NULL) {
 		fprintf(stderr,"Gethostname error\n");
 		return 1; /*get host name error*/
 	}
@@ -63,6 +64,7 @@ int get_web_page(char *hostname, char *page_buff, size_t maxsize) {
 		fprintf(stderr, "Send Error:%s\a\n", strerror(errno));
 		return 4; //send error
 	}
+	int cursor = 0;
 	while(1) {
 		nbytes = recv(sockfd, buffer, 1024, 0);
 		if(nbytes == -1) {
@@ -77,47 +79,52 @@ int get_web_page(char *hostname, char *page_buff, size_t maxsize) {
 		if(nbytes < 1024)
 			buffer[nbytes] = '\0';
 		*/
-		if(snprintf(page_buff, nbytes, buffer) == -1) {
+		if(cursor + nbytes > size) break;
+		if(snprintf(page_buff+cursor, nbytes, buffer) == -1) {
 			fprintf(stderr, "Snprintf Error:%s\n", strerror(errno));
 			break;
 		}
+		printf("cursor:%d\n", cursor);
+		cursor += nbytes;
 	}
 	close(sockfd);
-	return 0;
+	return cursor;
 }
 
 int main(int argc, char *argv[]) {
+	int fd;
 	char *seed;
-	linked_list *list_ptr;
+	queue *queue_ptr;
 	GHashTable *hashtable_ptr;
 	if(argc!=2) {
 		fprintf(stderr, "Usage: %s seed\a\n", argv[0]);
 		exit(1);
 	}
 	seed = argv[1];
-	linked_list_init(list_ptr);
-	linked_list_add_last(list_ptr, seed);
+	queue_ptr = queue_init();
+	queue_add_last(queue_ptr, seed);
        	hashtable_ptr = g_hash_table_new(g_str_hash, g_str_equal);
-	int fd;
-	while(list_ptr->size > 0) {
-		char hostname[100];
-		if(linked_list_remove_first(list_ptr, hostname, 100) > 0) {
-			fprintf(stderr, "Get next url Error");
-		}
-		get_web_page(hostname, page_buff, PAGEMAX);
-		char filename[100];
-		generate_file_name(hostname, filename, 100);
+	while(queue_ptr->size > 0) {
+		int length = queue_get_first_size(queue_ptr);
+		char hostname[length + 1];
+		queue_remove_first(queue_ptr, hostname, length);
+		hostname[length] = '\0';
+		get_web_page(hostname, page_buff, PAGEMAX - 1);
+		char filename[FILENAMEMAX];
+		generate_file_name(hostname, filename, FILENAMEMAX - 1);
+		filename[length] = '\0';
 		if((fd = open(filename, O_CREAT|O_EXCL|O_WRONLY, 0644)) < 0) {
 			fprintf(stderr, "Open Error:%s\n", strerror(errno));
+			break;
 		}
 		if(write(fd, page_buff, strlen(page_buff)) == -1) {
 			fprintf(stderr, "Write Error:%s\n", strerror(errno));
 			break;
 		}
-		parse_web_page(list_ptr, hashtable_ptr);
+		parse_web_page(queue_ptr, hashtable_ptr);
 	}
 	close(fd);
-	linked_list_destroy(list_ptr);
+	queue_destroy(queue_ptr);
 	g_hash_table_destroy(hashtable_ptr);
 	exit(0);
 }
