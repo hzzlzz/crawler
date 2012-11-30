@@ -50,22 +50,50 @@ void get_hostname_path_by_url(const char *url, char *hostname, char *path) {
 	}
 }
 
-/* huge work here */
-int parse_web_page(queue *queue_ptr, GHashTable *hashtable_ptr, char *src) {
-	
+/* Scan every link in the webpage*/
+void parse_web_page(queue *q_waiting_ptr, GHashTable *h_waiting_ptr, GHashTable *h_visited_ptr, const char *src) {
+	regex_t regex;
+	regmatch_t regmatchs[1];
+	int cursor = 0;
+	int errcode = regcomp(&regex, "(http|HTTP)://[a-zA-Z0-9]+(\\.[a-zA-Z0-9+,;/?&%$#=~_-]+)+", REG_EXTENDED);
+	if(errcode) {
+		char errbuf[100];
+		regerror(errcode, &regex, errbuf, 100);
+		fprintf(stderr, "Could not complie regex: %s\n", errbuf);
+		return;
+	}
+	while(!(errcode = regexec(&regex, src+cursor, 1, regmatchs, 0))) {
+		/* Throw the http:// part */
+		int length = regmatchs[0].rm_eo - (regmatchs[0].rm_so + 7);
+		char *url = (char *)malloc(length + 1);
+		strncpy(url, src+cursor + regmatchs[0].rm_so + 7, length);
+		url[length] = '\0';
+		if(g_hash_table_lookup(h_visited_ptr, url) == NULL &&
+			g_hash_table_lookup(h_waiting_ptr, url) == NULL) {
+			queue_add_last(q_waiting_ptr, url);
+			g_hash_table_add(h_waiting_ptr, url);
+			fprintf(stderr, "Add [%s]\n", url);
+		}
+		else {
+			free(url);
+		}
+		cursor += regmatchs[0].rm_eo;
+	}
+	regfree(&regex);
+	return;
 }
 
 /* The function get_web_page() get the web page indicated by hostname and copies to the buffer pointed by page_buff at most size bytes. Warning: If there is no null byte among the first size bytes of webpage get, the string in dest will not be null-terminated. The function returns the actual number of saved bytes in dest, or negative value if error occured. */
-int get_web_page(char *hostname, char* path, char *dest, size_t size) {
+int get_web_page(const char *hostname, const char* path, char *dest, size_t size) {
 	int sockfd, s, j;
 	char buffer[1024];
-	char sendBuff[200];
 	struct sockaddr_in server_addr;
 	struct hostent *host;
 	struct addrinfo hints;
 	struct addrinfo *result, *rp;
 	ssize_t nread;
-	char *service = "http";
+	char *send_buff, *service = "http";
+	char *http_request = "GET %s HTTP/1.0\r\nHost: %s\r\n\r\n";
 	int nbytes;
 
 	bzero(&hints, sizeof(struct addrinfo));
@@ -75,8 +103,8 @@ int get_web_page(char *hostname, char* path, char *dest, size_t size) {
 	hints.ai_protocol = 0;		 /* Any protocol */
 	s = getaddrinfo(hostname, service, &hints, &result);
 	if(s != 0) {
-		fprintf(stderr, "getaddrinf: %s\n", gai_strerror(s));
-		exit(EXIT_FAILURE);
+		fprintf(stderr, "Could not resolve [%s]: %s\n", hostname, gai_strerror(s));
+		return -1;
 	}
 	for(rp = result; rp != NULL; rp = rp->ai_next) {
 		sockfd = socket(rp->ai_family, rp->ai_socktype,
@@ -90,7 +118,7 @@ int get_web_page(char *hostname, char* path, char *dest, size_t size) {
 	}
 	if (rp == NULL) {
 		fprintf(stderr, "Could not connect\n");
-		return -1;
+		return -2;
 	}
 
 	freeaddrinfo(result);
@@ -114,11 +142,14 @@ int get_web_page(char *hostname, char* path, char *dest, size_t size) {
 		return -3; * connection error *
 	}
 	*/
-	sprintf(sendBuff, "GET %s HTTP/1.0\r\nHost: %s\r\n\r\n", path, hostname);
-	if(send(sockfd, sendBuff, strlen(sendBuff), 0) < 0) {
+	send_buff = (char *)malloc(strlen(http_request) + strlen(hostname) + strlen(path) + 1);
+	sprintf(send_buff, http_request, path, hostname);
+	if(send(sockfd, send_buff, strlen(send_buff), 0) < 0) {
 		fprintf(stderr, "Send Error:%s\a\n", strerror(errno));
+		free(send_buff);
 		return -2; /*sending error */
 	}
+	free(send_buff);
 	int cursor = 0;
 	while(1) {
 		nbytes = recv(sockfd, buffer, 1024, 0);
@@ -127,7 +158,7 @@ int get_web_page(char *hostname, char* path, char *dest, size_t size) {
 			break;
 		}
 		if(nbytes == 0) {
-			fprintf(stderr,"Read Status: %s\n", strerror(errno));
+			fprintf(stderr,"Read Status [%s%s]: %s\n", hostname, path, strerror(errno));
 			break;
 		}
 		/* why needed? losing data?
@@ -136,7 +167,7 @@ int get_web_page(char *hostname, char* path, char *dest, size_t size) {
 		*/
 		if(cursor + nbytes > size) {
 			nbytes = size - cursor;
-			fprintf(stderr, "Rest page cut:%s\n", hostname);
+			fprintf(stderr, "Rest Cut [%s]\n", hostname);
 			break;
 		}
 		strncpy(dest+cursor, buffer, nbytes);
@@ -146,32 +177,51 @@ int get_web_page(char *hostname, char* path, char *dest, size_t size) {
 	return cursor;
 }
 
+void key_destroy_func(gpointer data) {
+	free(data);
+}
+
 /* Start Point */
 int main(int argc, char *argv[]) {
-	int fd;
-	queue *queue_ptr;
-	GHashTable *hashtable_ptr;
+	int fd, seed_len, seed_len_max = 50;
+	char folder[seed_len_max];
+	queue *q_waiting_ptr;
+	GHashTable *h_waiting_ptr, *h_visited_ptr;
 	if(argc != 2) {
 		fprintf(stderr, "Usage: %s URL(without protocol)\a\n",
 				argv[0]);
 		exit(EXIT_FAILURE);
 	}
-	queue_ptr = queue_init();
-	queue_add_last(queue_ptr, argv[1]);
-       	hashtable_ptr = g_hash_table_new(g_str_hash, g_str_equal);
-	while(queue_ptr->size > 0) {
-		int url_len = queue_get_first_size(queue_ptr);
-		char url[url_len + 1];
+	seed_len = strlen(argv[1]) > seed_len_max-2 ? seed_len_max-2 : strlen(argv[1]);
+	strncpy(folder, argv[1], seed_len);
+	folder[seed_len] = '\0';
+	mkdir(folder, 0744);
+	folder[seed_len] = '/';
+	folder[seed_len+1] = '\0';
+	q_waiting_ptr = queue_init();
+	queue_add_last(q_waiting_ptr, argv[1]);
+	h_waiting_ptr = g_hash_table_new_full(g_str_hash, g_str_equal, key_destroy_func, NULL);
+	char *seed = (char *)malloc(strlen(argv[1]) + 1);
+	strcpy(seed, argv[1]);
+	g_hash_table_add(h_waiting_ptr, seed);
+       	h_visited_ptr = g_hash_table_new_full(g_str_hash, g_str_equal, key_destroy_func, NULL);
+	while(q_waiting_ptr->size > 0) {
+		int url_len = queue_get_first_size(q_waiting_ptr);
+		char *url = (char *)malloc(url_len + 1);
 		char hostname[url_len + 1];
 		char path[url_len + 1];
 		/* let the function add null terminator */
-		queue_remove_first(queue_ptr, url, url_len + 1);
+		queue_remove_first(q_waiting_ptr, url, url_len + 1);
+		g_hash_table_remove(h_waiting_ptr, url);
 		get_hostname_path_by_url(url, hostname, path);
 		int page_size = get_web_page(hostname, path, page_buff, PAGEMAX);
-		if(page_size < 0) break;
+		if(page_size < 0) continue;
 		page_buff[page_size] = '\0';
-		char filename[FILENAMEMAX];
-		generate_file_name(url, filename, FILENAMEMAX);
+		int folder_len = strlen(folder);
+		char filename[FILENAMEMAX+folder_len];
+		strncpy(filename, folder, folder_len);
+		generate_file_name(url, filename+folder_len, FILENAMEMAX);
+
 		if((fd = open(filename, O_CREAT|O_EXCL|O_WRONLY, 0644)) == -1) {
 			fprintf(stderr, "Open Error:%s\n", strerror(errno));
 			continue;
@@ -181,10 +231,13 @@ int main(int argc, char *argv[]) {
 			close(fd);
 			continue;
 		}
-		parse_web_page(queue_ptr, hashtable_ptr, page_buff);
+		g_hash_table_add(h_visited_ptr, url);
+		parse_web_page(q_waiting_ptr, h_waiting_ptr, h_visited_ptr, page_buff);
+		fprintf(stderr, "Waiting:[%d]\tWaiting_h:[%d]\tVisited:[%d]\n", q_waiting_ptr->size, g_hash_table_size(h_waiting_ptr), g_hash_table_size(h_visited_ptr));
 	}
 	/* if(fd != -1) close(fd); */
-	queue_destroy(queue_ptr);
-	g_hash_table_destroy(hashtable_ptr);
+	queue_destroy(q_waiting_ptr);
+	g_hash_table_destroy(h_waiting_ptr);
+	g_hash_table_destroy(h_visited_ptr);
 	exit(EXIT_SUCCESS);
 }

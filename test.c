@@ -1,7 +1,6 @@
 #include<stdio.h>
 int main()
 {
-	printf("%d\n", '\n');
-	printf("%d\n", '\r');
+	printf("_is%d,]is%d\n", '_', ']');
 	return 0;
 }
