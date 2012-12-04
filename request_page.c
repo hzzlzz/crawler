@@ -224,6 +224,9 @@ int save_webpage_to_file(const char* folder, const char *url,
 	if(s) {
 		pos = s - webpage + 4;
 	}
+	else {
+		pos = 0;
+	}
 
 	folder_len = strlen(folder);
 	filename = malloc(FILENAMEMAX+folder_len);
@@ -235,7 +238,7 @@ int save_webpage_to_file(const char* folder, const char *url,
 		free(filename);
 		return -1;
 	}
-	if(write(fd, webpage+pos, page_size-pos+1) == -1) {
+	if(write(fd, webpage+pos, page_size-pos) == -1) {
 		fprintf(stderr, "Write Error:%s\n", strerror(errno));
 		free(filename);
 		close(fd);
