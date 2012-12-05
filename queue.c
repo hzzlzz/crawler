@@ -57,6 +57,18 @@ bool queue_contains(queue *queue_ptr, char *data) {
 	return false;
 }
 
+void queue_clear(queue *queue_ptr) {
+	node_pointer current = queue_ptr->head->next;
+	while(current->next != NULL) {
+		node_pointer next = current->next;
+		free(current->data);
+		free(current);
+		current = next;
+		queue_ptr->size--;
+	}
+	queue_ptr->head->next = current;
+}
+
 void queue_destroy(queue *queue_ptr) {
 	node_pointer current = queue_ptr->head->next;
 	free(queue_ptr->head);

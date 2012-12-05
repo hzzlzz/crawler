@@ -60,8 +60,8 @@ void get_hostname_path_by_url(const char *url, char *hostname, char *path) {
 	}
 }
 
-/* Scan every link in the webpage*/
-void parse_web_page(queue *q_waiting_ptr, GHashTable *h_waiting_ptr, GHashTable *h_visited_ptr, const char *src) {
+/* Scan every link in the webpage and save them in urls */
+void parse_web_page(const char *src, queue *urls) {
 	int cursor, errcode, length;
 	char errbuf[100], *url;
 	regex_t regex;
@@ -84,21 +84,40 @@ void parse_web_page(queue *q_waiting_ptr, GHashTable *h_waiting_ptr, GHashTable 
 		strncpy(url, src+cursor+regmatchs[0].rm_so+7, length);
 		url[length] = '\0';
 
-		if(g_hash_table_lookup(h_visited_ptr, url) == NULL &&
-			g_hash_table_lookup(h_waiting_ptr, url) == NULL) 
-		{
-			queue_add_last(q_waiting_ptr, url);
-			g_hash_table_add(h_waiting_ptr, url);
+		queue_add_last(urls, url);
 
-			fprintf(stderr, "[%s] Added\n", url);
-		}
-		else {
-			free(url);
-		}
+		free(url);
+
 		cursor += regmatchs[0].rm_eo;
 	}
 	regfree(&regex);
 	return;
+}
+
+/* Add */
+void add_urls_to_waiting(queue *q_waiting_ptr, GHashTable *h_waiting_ptr, GHashTable *h_visited_ptr, queue *urls, size_t max_waiting) {
+	int url_length;
+	char *url;
+	
+	while(urls->size > 0) {
+		url_length = queue_get_first_size(urls);
+		url = (char *)malloc(url_length + 1);
+		queue_remove_first(urls, url, url_length + 1);
+		if(g_hash_table_lookup(h_visited_ptr, url) == NULL &&
+		   g_hash_table_lookup(h_waiting_ptr, url) == NULL) 
+		{
+			if(q_waiting_ptr->size < max_waiting) {
+				queue_add_last(q_waiting_ptr, url);
+				g_hash_table_add(h_waiting_ptr, url);
+				fprintf(stderr, "[%s] Added\n", url);
+			}
+			else {
+				free(url);
+				break;
+			}
+		}
+	}
+	queue_clear(urls);
 }
 
 /* The function get_web_page() get the web page indicated by hostname and copies to the buffer pointed by page_buff at most size bytes including a terminating null byte. The function returns the actual number of saved bytes in dest, or negative value if error occured. */
@@ -251,7 +270,7 @@ int crawl(const char *seed, size_t max_waiting, size_t max_total) {
 
 	int seed_len, url_len, page_size;
 	char *folder, *seed_m, *url, *hostname, *path;
-	queue *q_waiting_ptr;
+	queue *q_waiting_ptr, *urls;
 	GHashTable *h_waiting_ptr, *h_visited_ptr;
 
 	if(mkdir(seed, 0744) == -1) handle_error_en(errno, "mkdir");
@@ -266,6 +285,8 @@ int crawl(const char *seed, size_t max_waiting, size_t max_total) {
 
 	/* Queue of url waiting to be visited */
 	q_waiting_ptr = queue_init();
+	/* Queue for saving temp urls */
+	urls = queue_init();
 	/* Hashtable of url waiting to be visited, for fast querying */
 	h_waiting_ptr = g_hash_table_new_full(
 			g_str_hash, g_str_equal,
@@ -281,7 +302,8 @@ int crawl(const char *seed, size_t max_waiting, size_t max_total) {
 	queue_add_last(q_waiting_ptr, seed_m);
 	g_hash_table_add(h_waiting_ptr, seed_m);
 
-	while(q_waiting_ptr->size > 0) {
+	while(q_waiting_ptr->size > 0 &&
+			g_hash_table_size(h_visited_ptr) < max_total) {
 		/* Get length of next url to allocate memory */
 		url_len = queue_get_first_size(q_waiting_ptr);
 
@@ -312,9 +334,12 @@ int crawl(const char *seed, size_t max_waiting, size_t max_total) {
 		/* Adds url to visited table */
 		g_hash_table_add(h_visited_ptr, url);
 
-		/* Extract url from page */
-		parse_web_page(q_waiting_ptr, h_waiting_ptr,
-				h_visited_ptr, page_buff);
+		/* Extract all the url from the page */
+		parse_web_page(page_buff, urls);
+		/* Pick unvisited urls which are not waiting to
+		 * the waiting list */
+		add_urls_to_waiting(q_waiting_ptr, h_waiting_ptr,
+				h_visited_ptr, urls, max_waiting);
 
 		fprintf(stderr, "Waiting:[%d]\tVisited:[%d]\n", 
 				q_waiting_ptr->size,
@@ -324,6 +349,7 @@ int crawl(const char *seed, size_t max_waiting, size_t max_total) {
 	/* free(seed) not needed, visited hash table will free it */
 	free(folder);
 	
+	queue_destroy(urls);
 	queue_destroy(q_waiting_ptr);
 	g_hash_table_destroy(h_waiting_ptr);
 	g_hash_table_destroy(h_visited_ptr);
@@ -340,7 +366,7 @@ int main(int argc, char *argv[]) {
 		exit(EXIT_FAILURE);
 	}
 
-	crawl(argv[1], 0, 0);
+	crawl(argv[1], 1000, 500);
 
 	exit(EXIT_SUCCESS);
 }

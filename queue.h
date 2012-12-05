@@ -25,4 +25,6 @@ char * queue_remove_first(queue *, char *, size_t);
 
 bool queue_contains(queue *, char *);
 
+void queue_clear(queue *);
+
 void queue_destroy(queue *);
