@@ -1,7 +1,13 @@
 #include "queue.h"
 
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+
+#define handle_error(msg) \
+	do { perror(msg); exit(EXIT_FAILURE); } while (0)
+#define handle_error_en(en, msg) \
+	do { errno = en; perror(msg); exit(EXIT_FAILURE); } while (0)
 
 typedef struct list_node
 {
@@ -26,10 +32,12 @@ queue * queue_init() {
 
 void queue_add_last(queue *queue_ptr, const char *data) {
 	node_pointer new_tail;
-	int require_length = strlen(data) + 1;
-	queue_ptr->tail->data = (char *)malloc(require_length);
-	strncpy(queue_ptr->tail->data, data, require_length);
+	queue_ptr->tail->data = strdup(data);
+	if(queue_ptr->tail->data == NULL)
+		handle_error("strdup data");
 	new_tail = (node_pointer)malloc(sizeof(struct list_node));
+	if(new_tail == NULL)
+		handle_error("malloc tail");
 	new_tail->next = NULL;
 	queue_ptr->tail->next = new_tail;
 	queue_ptr->tail = new_tail;

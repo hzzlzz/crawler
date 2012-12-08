@@ -55,7 +55,10 @@ int save_webpage_to_file(const char *folder, const char *url,
 	}
 
 	folder_len = strlen(folder);
-	filename = malloc(FILENAMEMAX+folder_len);
+	filename = (char *)malloc(FILENAMEMAX+folder_len);
+	if(filename == NULL)
+		handle_error("malloc filename");
+
 	strncpy(filename, folder, folder_len);
 	generate_file_name(url, filename+folder_len, FILENAMEMAX);
 
@@ -73,4 +76,6 @@ int save_webpage_to_file(const char *folder, const char *url,
 
 	free(filename);
 	close(fd);
+
+	return 0;
 }

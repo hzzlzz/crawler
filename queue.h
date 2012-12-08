@@ -1,5 +1,6 @@
-#ifndef queue_h
-#define queue_h
+/* queue.h -- interface for a dynamic queue */
+#ifndef _QUEUE_H_
+#define _QUEUE_H_
 
 #include <stdbool.h>
 #include <stdlib.h>

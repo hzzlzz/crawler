@@ -11,7 +11,7 @@
 #define handle_error_en(en, msg) \
 	do { errno = en; perror(msg); exit(EXIT_FAILURE); } while (0)
 
-/* Make sure hostname and path have enough size */
+/* Notice: Make sure hostname and path have enough size */
 void get_hostname_path_by_url(const char *url, char *hostname, char *path) {
 	char *s;
 
@@ -28,8 +28,7 @@ void get_hostname_path_by_url(const char *url, char *hostname, char *path) {
 	}
 }
 
-/* Scan every link in the webpage and save unique ones into
- * waiting list */
+/* Scan every link in the webpage, save unique links into the waiting list */
 void parse_web_page(queue *q_waiting_ptr, GHashTable *h_waiting_ptr,
 		GHashTable *h_visited_ptr, const char *src,
 		size_t max_waiting) {
@@ -51,6 +50,8 @@ void parse_web_page(queue *q_waiting_ptr, GHashTable *h_waiting_ptr,
 		/* Throw the http:// part */
 		length = regmatchs[0].rm_eo - (regmatchs[0].rm_so + 7);
 		url = (char *)malloc(length + 1);
+		if(url == NULL)
+			handle_error("malloc url");
 
 		strncpy(url, src+cursor+regmatchs[0].rm_so+7, length);
 		url[length] = '\0';
@@ -61,7 +62,7 @@ void parse_web_page(queue *q_waiting_ptr, GHashTable *h_waiting_ptr,
 			if(q_waiting_ptr->size < max_waiting) {
 				queue_add_last(q_waiting_ptr, url);
 				g_hash_table_add(h_waiting_ptr, url);
-				//fprintf(stderr, "[%s] Added\n", url);
+				/*fprintf(stderr, "[%s] Added\n", url);*/
 			}
 			else {
 				free(url);

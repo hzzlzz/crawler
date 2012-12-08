@@ -15,7 +15,7 @@
 	do { errno = en; perror(msg); exit(EXIT_FAILURE); } while (0)
 
 
-/* The function get_web_page() get the web page indicated by hostname and copies to the buffer pointed by page_buff at most size bytes including a terminating null byte. The function returns the actual number of saved bytes in dest, or negative value if error occured. */
+/* The function get_web_page() gets the web page indicated by hostname and copies to the buffer pointed by page_buff at most size bytes including a terminating null byte. The function returns the actual number of saved bytes in dest, or negative value if error occured. */
 int get_web_page(const char *hostname, const char* path, char *dest, size_t size) {
 	int sockfd, s;
 	char buffer[1024];
@@ -70,7 +70,7 @@ int get_web_page(const char *hostname, const char* path, char *dest, size_t size
 	free(send_buff);
 
 	/* Set time out of recv, in case dead connection occurs,
-	 * causing recv waiting forever. */
+	 * causing recv to wait forever. */
 	tv_out.tv_sec = 10; /* Max waiting time */
 	tv_out.tv_usec = 0;
 	s = setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO,

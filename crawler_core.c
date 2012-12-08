@@ -1,6 +1,7 @@
 #include "crawler_core.h"
 
 #include <stdio.h>
+#include <string.h>
 #include <unistd.h>
 #include <sys/stat.h>
 #include <sys/types.h>
@@ -46,7 +47,7 @@ static void * crawling(void *arg) {
 	char *folder, *url, *hostname, *path, *page_buff;
 	queue *q_waiting_ptr;
 	GHashTable *h_waiting_ptr, *h_visited_ptr;
-	pthread_mutex_t mutex;
+	pthread_mutex_t *mutex;
 
 	struct thread_info *tinfo = (struct thread_info *) arg;
 
@@ -57,7 +58,7 @@ static void * crawling(void *arg) {
 	max_page_size = tinfo->max_page_size;
 	max_waiting = tinfo->max_waiting;
 	max_total = tinfo->max_total;
-	mutex = *tinfo->mutex;
+	mutex = tinfo->mutex;
 	
 	page_buff = (char *)malloc(max_page_size);
 	if(page_buff == NULL) handle_error("malloc page_buff");
@@ -79,15 +80,15 @@ static void * crawling(void *arg) {
 			}
 		}
 		/* freeze to get the lock */
-		if(pthread_mutex_lock(&mutex) != 0)
+		if(pthread_mutex_lock(mutex) != 0)
 			handle_error("pthread_mutex_lock");
 		if(q_waiting_ptr->size == 0) {
-			if(pthread_mutex_unlock(&mutex) != 0)
+			if(pthread_mutex_unlock(mutex) != 0)
 				handle_error("pthread_mutex_unlock");
 			continue;
 		}
 		if(g_hash_table_size(h_visited_ptr) >= max_total) {
-			if(pthread_mutex_unlock(&mutex) != 0)
+			if(pthread_mutex_unlock(mutex) != 0)
 				handle_error("pthread_mutex_unlock");
 			/* Break situation */
 			break;
@@ -105,7 +106,7 @@ static void * crawling(void *arg) {
 		 * considering for thread */
 		g_hash_table_add(h_visited_ptr, url);
 		
-		if(pthread_mutex_unlock(&mutex) != 0)
+		if(pthread_mutex_unlock(mutex) != 0)
 			handle_error("pthread_mutex_unlock");
 
 		hostname = (char *)malloc(url_len + 1);
@@ -129,7 +130,7 @@ static void * crawling(void *arg) {
 
 		/* lock could move into the function for
 		 * performance matter */
-		if(pthread_mutex_lock(&mutex) != 0)
+		if(pthread_mutex_lock(mutex) != 0)
 			handle_error("pthread_mutex_lock");
 
 		/* Extract all urls from the page and save them in 
@@ -137,14 +138,14 @@ static void * crawling(void *arg) {
 		parse_web_page(q_waiting_ptr, h_waiting_ptr,
 				h_visited_ptr, page_buff, max_waiting);
 
-		if(pthread_mutex_unlock(&mutex) != 0)
+		if(pthread_mutex_unlock(mutex) != 0)
 			handle_error("pthread_mutex_unlock");
 
 		fprintf(stderr, "Waiting:[%d]\tVisited:[%d]\n", 
 				q_waiting_ptr->size,
 				g_hash_table_size(h_visited_ptr));
 	}
-
+	
 	free(page_buff);
 
 	return 0;
