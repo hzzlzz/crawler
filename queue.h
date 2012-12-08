@@ -1,17 +1,14 @@
-#include<stdlib.h>
-#include<string.h>
-#include<stdbool.h>
+#ifndef queue_h
+#define queue_h
+
+#include <stdbool.h>
+#include <stdlib.h>
 
 typedef struct list_node *node_pointer;
-typedef struct list_node
-{
-	char *data; /*waiting to change to char */
-	node_pointer next;
-};
 
 typedef struct {
-	node_pointer head; /*do not save actual value*/
-	node_pointer tail; /*do not save actual value*/
+	node_pointer head; /* do not save actual value */
+	node_pointer tail; /* do not save actual value */
 	int size;
 } queue;
 
@@ -28,3 +25,5 @@ bool queue_contains(queue *, char *);
 void queue_clear(queue *);
 
 void queue_destroy(queue *);
+
+#endif

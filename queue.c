@@ -1,5 +1,14 @@
 #include "queue.h"
 
+#include <stdlib.h>
+#include <string.h>
+
+typedef struct list_node
+{
+	char *data;
+	node_pointer next;
+};
+
 queue * queue_init() {
 	queue *queue_ptr = (queue *)malloc(sizeof(queue));
 	queue_ptr->head = (node_pointer)malloc(sizeof(struct list_node));
@@ -16,10 +25,11 @@ queue * queue_init() {
 }
 
 void queue_add_last(queue *queue_ptr, const char *data) {
+	node_pointer new_tail;
 	int require_length = strlen(data) + 1;
 	queue_ptr->tail->data = (char *)malloc(require_length);
 	strncpy(queue_ptr->tail->data, data, require_length);
-	node_pointer new_tail = (node_pointer)malloc(sizeof(struct list_node));
+	new_tail = (node_pointer)malloc(sizeof(struct list_node));
 	new_tail->next = NULL;
 	queue_ptr->tail->next = new_tail;
 	queue_ptr->tail = new_tail;
@@ -34,10 +44,11 @@ int queue_get_first_size(queue *queue_ptr) {
 }
 
 char * queue_remove_first(queue *queue_ptr, char *data, size_t size) {
+	node_pointer node_ptr;
 	if(queue_ptr->head->next->next == NULL) {
 		return NULL;
 	}
-	node_pointer node_ptr = queue_ptr->head->next;
+	node_ptr = queue_ptr->head->next;
 	strncpy(data, node_ptr->data, size);
 	queue_ptr->head->next = node_ptr->next;
 	free(node_ptr->data);
