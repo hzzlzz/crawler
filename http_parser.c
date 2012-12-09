@@ -13,18 +13,26 @@
 
 /* Notice: Make sure hostname and path have enough size */
 void get_hostname_path_by_url(const char *url, char *hostname, char *path) {
-	char *s;
+	char *s, *p;
 
 	s = strstr(url, "/");
-	if(s) {
+	p = strstr(url, "?");
+
+	if(s && (!p || (p && p > s))) {
 		int pos = s - url;
 		strncpy(hostname, url, pos);
 		hostname[pos] = '\0';
-		strcpy(path, s);
+		strcpy(path, s+1);
+	}
+	else if(p && (!s || (s && p < s))) {
+		int pos = p - url;
+		strncpy(hostname, url, pos);
+		hostname[pos] = '\0';
+		strcpy(path, p);
 	}
 	else {
 		strcpy(hostname, url);
-		strcpy(path, "/\0");
+		strcpy(path, "\0");
 	}
 }
 

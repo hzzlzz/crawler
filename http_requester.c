@@ -9,21 +9,23 @@
 #include <unistd.h>
 #include <errno.h>
 
+#define BUFFSIZE 4096
+
 #define handle_error(msg) \
 	do { perror(msg); exit(EXIT_FAILURE); } while (0)
 #define handle_error_en(en, msg) \
 	do { errno = en; perror(msg); exit(EXIT_FAILURE); } while (0)
 
 
-/* The function get_web_page() gets the web page indicated by hostname and copies to the buffer pointed by page_buff at most size bytes including a terminating null byte. The function returns the actual number of saved bytes in dest, or negative value if error occured. */
+/* The function get_web_page() gets the web page indicated by hostname and copies to the buffer pointed by page_buff at most size bytes. The function returns the actual number of saved bytes in dest, or negative value if error occured. */
 int get_web_page(const char *hostname, const char* path, char *dest, size_t size) {
 	int sockfd, s;
-	char buffer[1024];
+	char buffer[BUFFSIZE];
 	struct addrinfo hints;
 	struct addrinfo *result, *rp;
 	struct timeval tv_out;
 	char *send_buff, *service = "http";
-	char *http_request = "GET %s HTTP/1.0\r\nHost: %s\r\n\r\n";
+	char *http_request = "GET /%s HTTP/1.0\r\nHost: %s\r\n\r\n";
 	int nbytes, cursor;
 
 	bzero(&hints, sizeof(struct addrinfo));
@@ -82,7 +84,7 @@ int get_web_page(const char *hostname, const char* path, char *dest, size_t size
 	fprintf(stderr, "Reading From [%s%s]...\n",
 			hostname, path);
 	while(1) {
-		nbytes = recv(sockfd, buffer, 1024, 0);
+		nbytes = recv(sockfd, buffer, BUFFSIZE, 0);
 		if(nbytes == -1) {
 			fprintf(stderr,"[%s%s] %s\n",
 					hostname, path,
@@ -95,11 +97,11 @@ int get_web_page(const char *hostname, const char* path, char *dest, size_t size
 					strerror(errno));
 			break;
 		}
-		if(cursor + nbytes > size - 1) {
+		if(cursor + nbytes > size) {
 			fprintf(stderr, "[%s%s] Rest Cut\n",
 					hostname, path);
 
-			nbytes = size - 1 - cursor;
+			nbytes = size - cursor;
 			strncpy(dest+cursor, buffer, nbytes);
 			cursor += nbytes;
 			break;
@@ -107,7 +109,6 @@ int get_web_page(const char *hostname, const char* path, char *dest, size_t size
 		strncpy(dest+cursor, buffer, nbytes);
 		cursor += nbytes;
 	}
-	dest[cursor] = '\0';
 	close(sockfd);
 	return cursor;
 }

@@ -53,6 +53,7 @@ int save_webpage_to_file(const char *folder, const char *url,
 	else {
 		pos = 0;
 	}
+	pos = 0;
 
 	folder_len = strlen(folder);
 	filename = (char *)malloc(FILENAMEMAX+folder_len);
