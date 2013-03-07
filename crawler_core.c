@@ -44,7 +44,8 @@ static void * crawling(void *arg) {
 
 	int url_len, page_size, sleep_times;
 	size_t max_page_size, max_waiting, max_total;
-	char *folder, *url, *hostname, *path, *page_buff;
+	char *folder, *url, *hostname, *path;
+	char *page_buff;
 	queue *q_waiting_ptr;
 	GHashTable *h_waiting_ptr, *h_visited_ptr;
 	pthread_mutex_t *mutex;
@@ -163,7 +164,8 @@ int start(const char *seed, size_t max_waiting,
 	/* statically allocated, no error checking here */
 	pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
 
-	if(mkdir(seed, 0744) == -1) handle_error_en(errno, "mkdir");
+	//if(mkdir(seed, 0744) == -1) handle_error_en(errno, "mkdir");
+	mkdir(seed, 0744);
 
 	seed_len = strlen(seed);
 	folder = (char *)malloc(seed_len+2);

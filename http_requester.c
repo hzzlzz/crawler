@@ -20,7 +20,7 @@
 /* The function get_web_page() gets the web page indicated by hostname and copies to the buffer pointed by page_buff at most size bytes. The function returns the actual number of saved bytes in dest, or negative value if error occured. */
 int get_web_page(const char *hostname, const char* path, char *dest, size_t size) {
 	int sockfd, s;
-	char buffer[BUFFSIZE];
+	unsigned char buffer[BUFFSIZE];
 	struct addrinfo hints;
 	struct addrinfo *result, *rp;
 	struct timeval tv_out;
@@ -102,11 +102,11 @@ int get_web_page(const char *hostname, const char* path, char *dest, size_t size
 					hostname, path);
 
 			nbytes = size - cursor;
-			strncpy(dest+cursor, buffer, nbytes);
+			memcpy(dest+cursor, buffer, nbytes);
 			cursor += nbytes;
 			break;
 		}
-		strncpy(dest+cursor, buffer, nbytes);
+		memcpy(dest+cursor, buffer, nbytes);
 		cursor += nbytes;
 	}
 	close(sockfd);

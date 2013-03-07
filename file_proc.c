@@ -42,7 +42,7 @@ char * generate_file_name(const char *url, char *filename, size_t size) {
 
 /* The function will turn url to reasonable filename, get rid of http header from webpage and save the webpage under the filename into directory indicated by folder */
 int save_webpage_to_file(const char *folder, const char *url,
-				const char *webpage, size_t page_size) {
+		const char *webpage, size_t page_size) {
 	int fd, folder_len, pos;
 	char *filename, *s;
 
@@ -53,7 +53,14 @@ int save_webpage_to_file(const char *folder, const char *url,
 	else {
 		pos = 0;
 	}
-	pos = 0;
+
+	/*
+	char *header = (char *) malloc(pos+2);
+	strncpy(header, webpage, pos+1);
+	header[pos+1] = '\0';
+	printf("%s", header);
+	free(header);
+	*/
 
 	folder_len = strlen(folder);
 	filename = (char *)malloc(FILENAMEMAX+folder_len);
@@ -62,8 +69,9 @@ int save_webpage_to_file(const char *folder, const char *url,
 
 	strncpy(filename, folder, folder_len);
 	generate_file_name(url, filename+folder_len, FILENAMEMAX);
-
-	if((fd=open(filename, O_CREAT|O_EXCL|O_WRONLY, 0644)) == -1) {
+	
+	/*
+	if((fd=open(filename, O_CREAT|O_EXCL|O_WRONLY|O_TRUNC, 0644)) == -1) {
 		fprintf(stderr, "Open Error:%s\n", strerror(errno));
 		free(filename);
 		return -1;
@@ -75,8 +83,14 @@ int save_webpage_to_file(const char *folder, const char *url,
 		return -2;
 	}
 
-	free(filename);
 	close(fd);
+	*/
 
+	FILE *fp;
+	fp=fopen(filename, "wb");
+	fwrite(webpage+pos, sizeof(webpage[pos]), page_size-pos, fp);
+	fclose(fp);
+
+	free(filename);
 	return 0;
 }
