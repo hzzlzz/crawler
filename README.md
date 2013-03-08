@@ -6,4 +6,4 @@ To compile and use it, make sure libglib2.0-dev is installed.
 
 Notice
 ------
-Multimedia files are corrupted, do not open them.
+No caching, file whose size greater than 500k is truncated.
